@@ -1,16 +1,16 @@
-export default function SearchResult({ movies }) {
+export default function MovieList({ movies }) {
   return (
     <ul className="list">
       {movies?.map((movie) => (
-        <SearchedMovie movie={movie} />
+        <Movie movie={movie} key={movie.imdbID} />
       ))}
     </ul>
   );
 }
 
-function SearchedMovie({ movie }) {
+function Movie({ movie }) {
   return (
-    <li key={movie.imdbID}>
+    <li>
       <img src={movie.Poster} alt={`${movie.Title} poster`} />
       <h3>{movie.Title}</h3>
       <div>
