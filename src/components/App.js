@@ -1,84 +1,112 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NavBar from "./NavBar";
 import MovieList from "./MovieList";
+import MovieDetails from "./MovieDetails";
 import { WatchedSummary, WatchedList } from "./WatchedList";
-
-const tempMovieData = [
-  {
-    imdbID: "tt1375666",
-    Title: "Inception",
-    Year: "2010",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
-  },
-  {
-    imdbID: "tt0133093",
-    Title: "The Matrix",
-    Year: "1999",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BNzQzOTk3OTAtNDQ0Zi00ZTVkLWI0MTEtMDllZjNkYzNjNTc4L2ltYWdlXkEyXkFqcGdeQXVyNjU0OTQ0OTY@._V1_SX300.jpg",
-  },
-  {
-    imdbID: "tt6751668",
-    Title: "Parasite",
-    Year: "2019",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BYWZjMjk3ZTItODQ2ZC00NTY5LWE0ZDYtZTI3MjcwN2Q5NTVkXkEyXkFqcGdeQXVyODk4OTc3MTY@._V1_SX300.jpg",
-  },
-];
-
-const tempWatchedData = [
-  {
-    imdbID: "tt1375666",
-    Title: "Inception",
-    Year: "2010",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
-    runtime: 148,
-    imdbRating: 8.8,
-    userRating: 10,
-  },
-  {
-    imdbID: "tt0088763",
-    Title: "Back to the Future",
-    Year: "1985",
-    Poster:
-      "https://m.media-amazon.com/images/M/MV5BZmU0M2Y1OGUtZjIxNi00ZjBkLTg1MjgtOWIyNThiZWIwYjRiXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg",
-    runtime: 116,
-    imdbRating: 8.5,
-    userRating: 9,
-  },
-];
+import { KEY } from "./privateData";
+import { Loader, ErrorMessage } from "./Messages";
 
 export default function App() {
-  const [movies, setMovies] = useState(tempMovieData);
-  const [watched, setWatched] = useState(tempWatchedData);
+  const [movies, setMovies] = useState([]);
+  const [watched, setWatched] = useState([]);
+  const [query, setQuery] = useState("");
+  const [isLoading, setisLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [selectedID, setSelectedID] = useState(null);
+
+  const closeMovieDetails = () => {
+    setSelectedID(null);
+  };
+
+  const addWatchedMovie = (IsChange, movie) => {
+    IsChange
+      ? setWatched((m) => [...m, movie])
+      : setWatched((m) =>
+          m.map((el) => (el.imdbID === movie.imdbID ? movie : el))
+        );
+  };
+  const getWatchedMovie = (mID) => {
+    return watched.find((m) => m.imdbID === mID);
+  };
 
   const handleRemove = (id) => {
     setWatched((m) => m.filter((el) => el.imdbID !== id));
   };
 
+  useEffect(() => {
+    closeMovieDetails();
+    if (query.length < 3) {
+      setMovies([]);
+      setError("");
+      return;
+    }
+    const controller = new AbortController();
+    (async () => {
+      try {
+        setError("");
+        setisLoading(true);
+        const r = await fetch(
+          `https://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+          { signal: controller.signal }
+        );
+        if (!r.ok) throw new Error("Something went wrong with fatching movies");
+        const d = await r.json();
+        if (d.Response === "False") throw new Error(d.Error);
+        setMovies(d.Search);
+        setError("");
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message);
+        }
+      } finally {
+        setisLoading(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [query]);
+
   return (
     <>
       <NavBar>
-        <SearchBar />
+        <SearchBar query={query} setQuery={setQuery} />
         <NumResults movies={movies} />
       </NavBar>
       <main className="main">
+        {
+          <Box>
+            {isLoading && <Loader />}
+            {!isLoading && !error && (
+              <MovieList
+                movies={movies}
+                selectedID={selectedID}
+                setSelectedID={setSelectedID}
+              />
+            )}
+            {error && <ErrorMessage error={error} />}
+          </Box>
+        }
         <Box>
-          <MovieList movies={movies} />
-        </Box>
-        <Box>
-          <WatchedSummary watched={watched} />
-          <WatchedList watched={watched} handleRemove={handleRemove} />
+          {selectedID ? (
+            <MovieDetails
+              selectedID={selectedID}
+              closeMovieDetails={closeMovieDetails}
+              addWatchedMovie={addWatchedMovie}
+              key={selectedID}
+              getWatchedMovie={getWatchedMovie}
+            />
+          ) : (
+            <>
+              <WatchedSummary watched={watched} />
+              <WatchedList watched={watched} handleRemove={handleRemove} />
+            </>
+          )}
         </Box>
       </main>
     </>
   );
 }
 
-function SearchBar() {
-  const [query, setQuery] = useState("");
+function SearchBar({ query, setQuery }) {
   return (
     <input
       className="search"

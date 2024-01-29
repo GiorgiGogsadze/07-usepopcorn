@@ -1,5 +1,6 @@
 const average = (arr) =>
-  arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0);
+  Math.round(arr.reduce((acc, cur, i, arr) => acc + cur / arr.length, 0) * 10) /
+  10;
 
 export function WatchedSummary({ watched }) {
   const avgImdbRating = average(watched.map((movie) => movie.imdbRating));
@@ -32,7 +33,7 @@ export function WatchedSummary({ watched }) {
 
 export function WatchedList({ watched, handleRemove }) {
   return (
-    <ul className="list">
+    <ul className="list list-watched">
       {watched.map((movie) => (
         <WatchedMovie
           movie={movie}
@@ -46,8 +47,8 @@ export function WatchedList({ watched, handleRemove }) {
 function WatchedMovie({ movie, handleRemove }) {
   return (
     <li>
-      <img src={movie.Poster} alt={`${movie.Title} poster`} />
-      <h3>{movie.Title}</h3>
+      <img src={movie.poster} alt={`${movie.title} poster`} />
+      <h3>{movie.title}</h3>
       <div>
         <p>
           <span>⭐️</span>
