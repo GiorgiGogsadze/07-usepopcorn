@@ -1,29 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import NavBar from "./NavBar";
 import MovieList from "./MovieList";
 import MovieDetails from "./MovieDetails";
 import { WatchedSummary, WatchedList } from "./WatchedList";
-import { KEY } from "./privateData";
 import { Loader, ErrorMessage } from "./Messages";
+import { useFetch } from "./useFetch";
+import { KEY } from "./privateData";
+import { useLocalStorageState } from "./useLocalStorageState";
+import { useKey } from "./useKey";
 
 export default function App() {
-  const [movies, setMovies] = useState([]);
-  const [watched, setWatched] = useState([]);
+  const [watched, setWatched] = useLocalStorageState([], "watched");
   const [query, setQuery] = useState("");
-  const [isLoading, setisLoading] = useState(false);
-  const [error, setError] = useState("");
   const [selectedID, setSelectedID] = useState(null);
 
   const closeMovieDetails = () => {
     setSelectedID(null);
   };
 
-  const addWatchedMovie = (IsChange, movie) => {
-    IsChange
-      ? setWatched((m) => [...m, movie])
-      : setWatched((m) =>
-          m.map((el) => (el.imdbID === movie.imdbID ? movie : el))
-        );
+  const addWatchedMovie = (isUpdate, movie) => {
+    if (isUpdate) {
+      setWatched((m) =>
+        m.map((el) =>
+          el.imdbID === movie.imdbID
+            ? {
+                ...movie,
+                decisionCount: el.decisionCount + movie.decisionCount,
+              }
+            : el
+        )
+      );
+    } else {
+      setWatched((m) => [...m, movie]);
+    }
   };
   const getWatchedMovie = (mID) => {
     return watched.find((m) => m.imdbID === mID);
@@ -33,37 +42,12 @@ export default function App() {
     setWatched((m) => m.filter((el) => el.imdbID !== id));
   };
 
-  useEffect(() => {
-    closeMovieDetails();
-    if (query.length < 3) {
-      setMovies([]);
-      setError("");
-      return;
-    }
-    const controller = new AbortController();
-    (async () => {
-      try {
-        setError("");
-        setisLoading(true);
-        const r = await fetch(
-          `https://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
-          { signal: controller.signal }
-        );
-        if (!r.ok) throw new Error("Something went wrong with fatching movies");
-        const d = await r.json();
-        if (d.Response === "False") throw new Error(d.Error);
-        setMovies(d.Search);
-        setError("");
-      } catch (err) {
-        if (err.name !== "AbortError") {
-          setError(err.message);
-        }
-      } finally {
-        setisLoading(false);
-      }
-    })();
-    return () => controller.abort();
-  }, [query]);
+  const { data, isLoading, error } = useFetch(
+    `https://www.omdbapi.com/?apikey=${KEY}&s=${query}`,
+    closeMovieDetails,
+    query.length < 3
+  );
+  const movies = data.Search || [];
 
   return (
     <>
@@ -107,6 +91,12 @@ export default function App() {
 }
 
 function SearchBar({ query, setQuery }) {
+  const inputEl = useRef(null);
+  useKey("Enter", () => {
+    if (document.activeElement === inputEl.current) return;
+    inputEl.current.focus();
+    setQuery("");
+  });
   return (
     <input
       className="search"
@@ -114,6 +104,7 @@ function SearchBar({ query, setQuery }) {
       placeholder="Search movies..."
       value={query}
       onChange={(e) => setQuery(e.target.value)}
+      ref={inputEl}
     />
   );
 }

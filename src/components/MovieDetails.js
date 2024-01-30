@@ -1,6 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import StarRating from "./StarRating";
-import { Loader, ErrorMessage } from "./Messages";
+import { Loader } from "./Messages";
+import { useFetch } from "./useFetch";
+import { KEY } from "./privateData";
+import { useKey } from "./useKey";
 
 export default function MovieDetails({
   selectedID,
@@ -8,12 +11,15 @@ export default function MovieDetails({
   addWatchedMovie,
   getWatchedMovie,
 }) {
-  const [movie, setMovie] = useState({});
-  const [isLoading, setisLoading] = useState(false);
+  const watchedMovie = getWatchedMovie(selectedID);
+  const countRef = useRef(0);
   const [rating, setRating] = useState(null);
+
+  const { data: movie, isLoading } = useFetch(
+    `http://www.omdbapi.com/?apikey=${KEY}&i=${selectedID}`
+  );
   const {
     Title: title,
-    Year: year,
     Poster: poster,
     Runtime: runtime,
     imdbRating,
@@ -22,30 +28,7 @@ export default function MovieDetails({
     Actors: actors,
     Director: director,
     Genre: genre,
-  } = movie;
-  useEffect(() => {
-    (async () => {
-      setisLoading(true);
-      const res = await fetch(
-        `http://www.omdbapi.com/?apikey=70e45600&i=${selectedID}`
-      );
-      const data = await res.json();
-      setMovie(data);
-      setisLoading(false);
-    })();
-  }, [selectedID]);
-
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.code === "Escape") {
-        closeMovieDetails();
-      }
-    };
-    document.addEventListener("keydown", handleEsc);
-    return () => {
-      document.removeEventListener("keydown", handleEsc);
-    };
-  }, [closeMovieDetails]);
+  } = movie || {};
 
   const handleAdd = () => {
     const newWatchedMovie = {
@@ -55,12 +38,13 @@ export default function MovieDetails({
       imdbRating: +imdbRating,
       userRating: rating,
       runtime: +runtime.split(" ")[0],
+      decisionCount: countRef.current,
     };
-    addWatchedMovie(watchedMovie ? false : true, newWatchedMovie);
+    addWatchedMovie(Boolean(watchedMovie), newWatchedMovie);
     closeMovieDetails();
   };
 
-  const watchedMovie = getWatchedMovie(selectedID);
+  useKey("Escape", closeMovieDetails);
 
   useEffect(() => {
     if (title) {
@@ -71,6 +55,10 @@ export default function MovieDetails({
       };
     }
   }, [title]);
+
+  useEffect(() => {
+    if (rating) countRef.current++;
+  }, [rating]);
 
   return isLoading ? (
     <Loader />
